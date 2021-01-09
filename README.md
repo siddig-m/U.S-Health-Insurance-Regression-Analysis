@@ -5,7 +5,7 @@ For insurance companies, it is often the case that they charge different premium
 
 ## What it does
 
- This project analyzes a dataset containing basic health information on 1338 medical patients and the charges billed to their insurance companies for that particular year (Dataset: [link](https://www.kaggle.com/mirichoi0218/insurance)). The report will begin by analyzing the basic relationship between variables, looking for significant insights both visually and statistically. Using the knowledge attained from the data analysis, a multiple regression linear model will be constructed for the purpose of predicting future charges to insurance companies based on the variables in the data set. 
+ This project analyzes a [dataset](https://www.kaggle.com/mirichoi0218/insurance) containing basic health information on 1338 medical patients and the charges billed to their insurance companies for that particular year. The report will begin by analyzing the basic relationship between variables, looking for significant insights both visually and statistically. Using the knowledge attained from the data analysis, a multiple regression linear model will be constructed for the purpose of predicting future charges to insurance companies based on the variables in the data set. 
 
 ## Challenges I ran into
 
@@ -17,6 +17,7 @@ I'm proud of the thoroughness of the project as I believe we were able to explor
 
 ## What I learned
 I learned that it may not always be simple to meet regression assumptions and how this can pose a challenge when implementing models. I also learned about the importance of understanding your data by using data visualization and exploration methods before implementing any model(s). 
+
 ## What's next for U.S Health Insurance Regression Analysis
 
 With more complex data transformation techniques I'd look into using those to improve the normality assumption for the data that would extend further than log or Box-Cox transformations. Also, exploring some more datasets could be useful such as looking at smoking frequency rather than if they smoked or not to be able to improve our model. 
