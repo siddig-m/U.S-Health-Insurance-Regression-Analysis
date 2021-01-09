@@ -1,0 +1,698 @@
+---
+title: "Insurance Regression"
+author: "Tom McHenry, Moira Benedict, Siddig Mohamed"
+date: "23/11/2020"
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+knitr::opts_chunk$set(warning  = FALSE)
+knitr::opts_chunk$set(message  = FALSE)
+```
+
+Fitting and Estimating the values from the data.
+
+Describing the variables, what our response is, predictors. 
+```{r}
+data <- read.csv("insurancedata.csv", header = T)
+#get data into training and test sets
+set.seed(1234)
+dt = sort(sample(nrow(data),nrow(data)*.7))
+data1 = data[dt,]
+train = data[dt,]
+test = data[-dt,]
+str(data1)
+
+data1$sex <- as.factor(data1$sex)
+data1$smoker <- as.factor(data1$smoker)
+data1$region <- as.factor(data1$region)
+
+
+```
+```{r}
+# import necessary packages 
+
+library(caret)
+library(faraway)
+library(MASS)
+library(lmtest)
+library(tidyverse)
+
+
+```
+
+Better insights about the response variable and predictors relationships.
+```{r}
+
+#plot for gender and weight
+plot(data1$sex, data1$bmi, main = "BMI vs Gender", col = c(3,4))
+
+#General Distribution of Charges
+
+hist(data1$charges, main = "Distribution of Charges", xlab = "Charges $", ylab = "Frequency")
+
+#Subset of distributions with Charges for smokers. Difference worth looking into
+
+nonsmokers<-subset(data1, smoker == "no")
+yessmokers<-subset(data1, smoker =="yes")
+
+par(mfrow = c(1,2))
+
+hist(nonsmokers$charges, main = "Distribution of Charges: Non Smokers", xlab = "Charges $", ylab = "Frequency", xlim = c(0,50000))
+
+
+hist(yessmokers$charges, main = "Distribution of Charges: Smokers", xlab = "Charges $", ylab = "Frequency", xlim = c(0,50000))
+
+#Subset of distributions with Charges for Regions. All the same --> 
+par(mfrow = c(1,4))
+region.sw <- subset(data1, region == "southwest")
+
+hist(region.sw$charges, main = "Distribution of \n Charges: Southwest", xlab = "Charges $", ylab = "Frequency", xlim = c(0,50000))
+
+region.se <- subset(data1, region == "southeast")
+
+hist(region.se$charges, main = "Distribution \n of Charges: SouthEast", xlab = "Charges $", ylab = "Frequency", xlim = c(0,50000))
+
+region.se <- subset(data1, region == "southeast")
+
+region.ne <- subset(data1, region == "northeast")
+
+hist(region.ne$charges, main = "Distribution \n of Charges: Northeast", xlab = "Charges $", ylab = "Frequency", xlim = c(0,50000))
+
+region.nw <- subset(data1, region == "northwest")
+
+hist(region.nw$charges, main = "Distribution \n of Charges: Northwest", xlab = "Charges $", ylab = "Frequency", xlim = c(0,50000))
+
+
+```
+
+This tells us that: there is a difference in pricing for groups relating to smoking status, body weight and age
+
+
+
+Significance of Regression: 
+have an extremely small p-value implying that at least one of the predictors is statistically significant
+```{r}
+#H0 they all equal zero
+
+
+
+data1$sex <- as.factor(data1$sex)
+data1$smoker <- as.factor(data1$smoker)
+data1$region <- as.factor(data1$region)
+
+reg1 <- lm(charges~., data = data1)
+summary(reg1)
+
+
+
+```
+Quick View of the relationship between variables: seems to be no  very little relationship between the  variables.Smoking, bmi and age seem to be the largest. WOULD LIKE A CORRELATION PLot>>  Multicollinerity shouldnt be an issue
+```{r}
+
+pairs(~charges+age+bmi+children+smoker+region+sex,data=data1,main="Scatterplot Matrix")
+
+
+```
+Nested Model: Removing all categorical variables
+```{r}
+
+#no categorical variables
+
+numreg <- lm(charges~age+bmi+children, data = data1)
+anova(numreg,reg1)
+
+#shows at least one of the categorical variables is important
+
+#removing children
+
+nochildren <- lm(charges~age+sex+bmi+smoker+region, data = data1)
+anova(nochildren,reg1)
+
+#cant remove
+
+
+```
+Categorical Variables:
+```{r}
+#removing the category of sex
+nosex <- lm(charges~age+bmi+children+smoker+region, data = data1)
+anova(nosex,reg1)
+summary(nosex)$r.squared
+# sex is not an important predictor and can be removed,
+
+#remove smoker
+nosmoke <- lm(charges~age+bmi+children+sex+region, data = data1)
+anova(nosmoke,reg1)
+summary(nosmoke)$r.squared
+#smoker is an important predictor and shouldnt be removed, model r squared drops
+
+#remove region
+noregion <- lm(charges~age+bmi+children+sex+smoker, data = data1)
+anova(noregion,reg1)
+summary(noregion)$r.squared
+
+sex.region <- lm(charges~age+bmi+children+smoker, data = data1)
+summary(sex.region)$r.squared
+# with a significance level of 0.05 it could be concluded that region is not a significant predictor of charges and therefore can be removed
+``` 
+Visual Demonstration of Interaction
+```{r}
+library(gridExtra)
+library(tidyverse)
+#visual interaction with smoker
+age.smoker <- ggplot(data1,aes(age,charges, colour = smoker))+geom_point()+geom_smooth()
+
+bmi.smoker <- ggplot(data1,aes(bmi,charges, colour = smoker))+geom_point()+geom_smooth()
+
+children.smoker <- ggplot(data1,aes(children,charges, colour = smoker))+geom_point()+geom_smooth()
+
+
+grid.arrange(children.smoker,bmi.smoker,age.smoker, nrow = 2)
+
+
+#seems to be relevent the category of smoker, most relevant with and age
+
+#graph with only region category, not really significant
+age.region <- ggplot(data1,aes(age,charges, colour = region))+geom_point()+geom_smooth()
+
+bmiregion<-ggplot(data1,aes(bmi,charges, colour = region))+geom_point()+geom_smooth()
+
+children.region<-ggplot(data1,aes(children,charges, colour = region))+geom_point()+geom_smooth()
+
+
+grid.arrange(age.region,bmiregion,children.region, nrow = 2)
+
+#graph with only sex category, not really significant, not really significant
+
+
+agesex <- ggplot(data1,aes(age,charges, colour = sex))+geom_point()+geom_smooth()
+
+bmisex <- ggplot(data1,aes(bmi,charges, colour = sex))+geom_point()+geom_smooth()
+
+children.sex <- ggplot(data1,aes(children,charges, colour = sex))+geom_point()+geom_smooth()
+
+grid.arrange(children.sex,bmisex,agesex, nrow = 2)
+
+
+
+```
+
+Interaction
+
+```{r}
+#general interaction model
+inter.model <- lm(charges~ age*sex*bmi*children*smoker, data = data1)
+coef(inter.model)
+anova(inter.model,reg1)
+
+# at least one interaction is important
+
+no.interactions <- lm(charges~age+bmi+children+smoker, data = data1)
+# based on plots only visually interaction was from the smoking variables
+smoker.inter.model<- lm(charges~ age + children +smoker + bmi + age*smoker + smoker*bmi + smoker*children, data = data1)
+                           
+anova(no.interactions,smoker.inter.model)
+
+
+``` 
+There are no significant interactions between nonsmoking interactions. Only important interactions are with smoking status as the graphs suggested.
+
+MODELS Explored:
+
+Siddig: Smoking Interactions
+
+```{r}
+
+# model with the smoker interaction terms
+smoker.inter.model <- lm(charges~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children, data = train)
+
+summary(smoker.inter.model)
+
+```
+
+
+
+```{r}
+# create functions for visual and formal diagnostics 
+model_diag = function(model){
+  par(mfrow = c(1, 2))
+plot(resid(model)~fitted(model), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residuals", main = "Residual plot")
+abline(h = 0, col = "darkorange", lwd = 2)
+
+qqnorm(resid(model), main = "Normal Q-Q Plot", col = "darkgrey")
+qqline(resid(model), col = "dodgerblue", lwd = 2)
+
+}
+formal_diag = function(model) {
+  return(list(bptest(model),shapiro.test(resid(model))))
+  
+}
+
+
+
+# get model diagnostics for basic smoker interaction model
+model_diag(smoker.inter.model)
+formal_diag(smoker.inter.model)
+
+# EV assumption holds
+# Normality assumption doesn't hold. 
+# Lineartiy also violated
+
+
+```
+
+
+
+
+```{r}
+
+# Try to fix model assumptions 
+
+# Remove Influential Points 
+
+train2 = train[-which(cooks.distance(smoker.inter.model) > 4 / length(cooks.distance(smoker.inter.model))),]
+```
+
+
+```{r}
+# fit new model without influential points 
+
+smoker.inter.model2 <- lm(charges~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children, data = train2)
+
+model_diag(smoker.inter.model2)
+formal_diag(smoker.inter.model2)
+
+# improves EV but no change for normality 
+```
+Tried a bunch of other techniques - quad, cubic terms, box cox, log transformation, standardizing dataset instead
+
+# log transformation attempt --> not useful, worse
+
+```{r}
+
+# log transformation attempt
+smoker.inter.model3 <- lm(log(charges)~ age + children +smoker + bmi + age*smoker + smoker*bmi + smoker*children, data = train)
+
+model_diag(smoker.inter.model3)
+formal_diag(smoker.inter.model3)
+
+
+
+```
+
+# try polynomial terms 
+
+```{r}
+
+
+
+
+# quadratic model
+smoker.inter.model4 <- lm(charges ~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children+
+                               I(age^2) + I(children^2) + I(bmi^2) , data = train)
+
+# cubic model
+smoker.inter.model5 <- lm(charges ~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children+
+                           I(age^2) + I(children^2) + I(bmi^2)+
+                            I(age^3) + I(children^3) + I(bmi^3) , data = train)
+
+
+model_diag(smoker.inter.model4)
+formal_diag(smoker.inter.model4)
+model_diag(smoker.inter.model5)
+formal_diag(smoker.inter.model5)
+```
+
+
+
+
+```{r}
+
+# attempt box-cox transformation on all models, including polynomial term models to see if we can do better
+
+boxcox(smoker.inter.model,lambda = seq(0, 5, by = 0.05))
+boxcox(smoker.inter.model2,lambda = seq(0, 5, by = 0.05))
+boxcox(smoker.inter.model3,lambda = seq(0, 5, by = 0.05))
+boxcox(smoker.inter.model4,lambda = seq(0, 5, by = 0.05))
+boxcox(smoker.inter.model5,lambda = seq(0, 5, by = 0.05))
+
+#lamda values for respective model
+
+lamda  = 0.20
+lamda2 = 0.25
+lamda3 = 1.80
+lamda4 = 0.15
+lamda5 = 0.15
+
+# fit new transformed models using lamda values 
+lm_transf = lm((charges^(lamda)-1/(lamda))~ age + sex + bmi + children + smoker,data=train)
+
+lm_transf2 = lm((charges^(lamda2)-1/(lamda2))~ age + sex + bmi + children + smoker,data=train2)
+
+lm_transf3 = lm((log(charges)^(lamda3)-1/(lamda3))~ age + sex + bmi + children + smoker,data=train)
+
+lm_transf4 = lm((charges^(lamda4)-1/(lamda4))~age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children+
+                           I(age^2) + I(children^2) + I(bmi^2) ,data=train)
+
+lm_transf5 = lm((charges^(lamda5)-1/(lamda5))~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children+
+                           I(age^2) + I(children^2) + I(bmi^2)+
+                            I(age^3) + I(children^3) + I(bmi^3) , data = train)
+
+```
+
+
+```{r}
+
+
+# test these new box cox transformed models and compare to previous models as well
+
+
+
+model_diag(lm_transf)
+
+formal_diag(lm_transf) 
+formal_diag(smoker.inter.model) ##
+
+
+model_diag(lm_transf2)
+
+formal_diag(lm_transf2)
+formal_diag(smoker.inter.model2) ##### best
+
+
+
+
+model_diag(lm_transf3)
+
+formal_diag(lm_transf3) ##
+formal_diag(smoker.inter.model3)
+
+
+
+
+model_diag(lm_transf4)
+
+formal_diag(lm_transf4)
+formal_diag(smoker.inter.model4) ##
+
+
+
+
+model_diag(lm_transf5)
+
+formal_diag(lm_transf5)
+formal_diag(smoker.inter.model5) ####  2nd best
+
+#  Turns out Box Cox transformations are not much better
+
+
+
+```
+
+```{r}
+
+# Remove influential points for the two best models (interaction w/o influential points and interaction w/ cubic terms) 
+#in terms of assumptions these two were the best, but one of them already has infl points removed
+# so lets remove influential points for the cubic model -> see if it gets better 
+
+
+#remove influential points from sample 
+data5 = train[-which(cooks.distance(smoker.inter.model5) > 4 / length(cooks.distance(smoker.inter.model5))),]
+
+
+```
+
+```{r}
+
+# fit new models for the previously best models to see if they get better with removing influential points 
+smoker.inter.model5_wo_inf = lm((charges^(lamda5)-1/(lamda5))~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children+
+                           I(age^2) + I(children^2) + I(bmi^2) +
+                            I(age^3) + I(children^3) + I(bmi^3),data=data5)
+
+
+```
+
+
+```{r}
+
+formal_diag(smoker.inter.model5_wo_inf)
+formal_diag(smoker.inter.model5)
+formal_diag(smoker.inter.model2) ### best 
+
+# therefore, basic interaction model without inlfuential point is the best in terms of assumptions 
+```
+
+```{r}
+# try some variable selection techniques to find out if our model can get better 
+
+
+# If our interest is to find which predictors is useful we will use AIC, BIC, adj R^2 
+
+
+# stepwise variable selection
+
+fit_null = lm(charges ~ 1 , data = train2)
+
+fit_step_aic = step(fit_null  ,
+                    scope = charges~ age + children +smoker + bmi + age:smoker + smoker:bmi + smoker:children, 
+                    direction = "both"
+                    ,trace = 0)
+
+fit_step_aic
+# best model that best fits model assumptions 
+
+```
+
+```{r}
+
+# given that all other variables are used bmi is insigificant so we could drop this varibale as well
+
+fit_step_aic_dropbmi = lm(charges ~ age + smoker + children + smoker:bmi + smoker:children, data = train2 )
+
+
+summary(fit_step_aic_dropbmi)
+
+```
+
+
+
+```{r}
+# dropping bmi as a predictor doesn't help equal variance assumption -> makes it worse
+
+formal_diag(fit_step_aic)
+formal_diag(fit_step_aic_dropbmi)
+
+
+```
+
+
+```{r} 
+# k fold cross validation for prospective models
+
+set.seed(123)
+
+train.control = trainControl(method = "repeatedcv", number = 10, repeats =3 )
+
+# train the model
+stepwise_model = train(charges ~ smoker + age + bmi + children + smoker:bmi + smoker:children,
+              data = train2, method = "lm", trControl = train.control)
+
+print(stepwise_model)
+
+# stepwise model gives RMSE of 2592.06
+
+set.seed(123)
+
+train.control = trainControl(method = "repeatedcv", number = 10, repeats =3 )
+
+# train the model
+model = train(charges ~ smoker + age + bmi + children + smoker:bmi + smoker:children + age:smoker,
+              data = train2, method = "lm", trControl = train.control)
+
+print(model)
+
+
+#train the model
+
+set.seed(123)
+
+model2 = train(charges ~ smoker + age + children + smoker:bmi + smoker:children ,
+              data = train2, method = "lm", trControl = train.control)
+
+print(model2)
+
+
+# using k folds cross validation, the best model for prediction is the  steowise model without bmi
+```
+
+```{r}
+
+n = length(train2)
+
+# PRESS (or RMSE with LOOCV) for stepwise model is better
+
+sqrt(sum((resid(smoker.inter.model2)/(1-hatvalues(smoker.inter.model2)))^2)/n)
+sqrt(sum((resid(fit_step_aic)/(1-hatvalues(fit_step_aic)))^2)/n) ####
+sqrt(sum((resid(fit_step_aic_dropbmi)/(1-hatvalues(fit_step_aic_dropbmi)))^2)/n) ####
+
+#step wise model is better for predicting as it 
+
+
+```
+
+```{r}
+
+# for which predictors are useful 
+AIC(smoker.inter.model2,fit_step_aic,fit_step_aic_dropbmi) 
+BIC(smoker.inter.model2,fit_step_aic,fit_step_aic_dropbmi)
+summary(smoker.inter.model2)$adj.r.squared
+summary(fit_step_aic)$adj.r.squared 
+summary(fit_step_aic_dropbmi)$adj.r.squared
+
+```
+# therefore the BEST model is the original smoking interaction model with influential points removed. 
+
+
+
+Moira: No interactions and highest correlated predictors
+
+```{r}
+#model starting point * = Model a: 
+model_a <- lm(charges~age+bmi+children+smoker, data = data1)
+summary(model_a) 
+
+#model assumptions for model #a: 
+par(mfrow=c(1,2))
+plot(fitted(model_a), resid(model_a), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residual",cex=2,
+     main = "Residual plot")
+
+abline(h = 0, col = "darkorange", lwd = 2) 
+qqnorm(resid(model_a), col = "grey",pch=20,cex=2) 
+qqline(resid(model_a), col = "dodgerblue", lwd = 2)
+
+bptest(model_a)  
+#small p-value = eq violated 
+shapiro.test(resid(model_a))
+#small p-value = norm violated   
+
+#** all assumptions violated **
+```
+
+
+```{r}
+#Outliers and influential points *= Model b/c
+influ_idx = which(cooks.distance(model_a) > 4 / length(cooks.distance(model_a))) 
+length(influ_idx) #influential points
+sum(abs(rstandard(model_a)[influ_idx]) > 2) #outliers
+
+data2 <- data1[-influ_idx,]
+model_b <- lm(charges~age+bmi+children+smoker, data = data2)
+par(mfrow=c(1,2))
+plot(fitted(model_b), resid(model_b), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residual",cex=2,
+     main = "Residual plot")
+abline(h = 0, col = "darkorange", lwd = 2) 
+qqnorm(resid(model_b), col = "grey",pch=20,cex=2) 
+qqline(resid(model_b), col = "dodgerblue", lwd = 2)
+bptest(model_b)
+shapiro.test(resid(model_b))
+#taking out 'influential points' not helpful in correcting model assumptions 
+
+influ_idx2 = which(abs(rstandard(model_a)[influ_idx]) > 2)
+data3 <- data1[-influ_idx2,]
+model_c <- lm(charges~age+bmi+children+smoker, data = data2)
+par(mfrow=c(1,2))
+plot(fitted(model_c), resid(model_c), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residual",cex=2,
+     main = "Residual plot")
+abline(h = 0, col = "darkorange", lwd = 2) 
+qqnorm(resid(model_c), col = "grey",pch=20,cex=2) 
+qqline(resid(model_c), col = "dodgerblue", lwd = 2)
+bptest(model_c)
+shapiro.test(resid(model_c))
+#just taking outliers also not helpful - range of data is possibly too large?
+```
+
+
+```{r}
+#Boxcox Transformation *= model d: 
+boxcox(model_a,lambda = seq(0.3, 0.7, by = 0.05))
+
+#maximized at lambda = 0.31
+lambda = 0.31
+model_d <- lm(((charges^(lambda)-1)/(lambda))~ age+bmi+children+smoker, data=data1) 
+par(mfrow=c(1,2))
+plot(fitted(model_d), resid(model_d), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residuals", main = "Residual Plot") 
+abline(h = 0, col = "darkorange", lwd = 2) 
+qqnorm(resid(model_d), col = "grey",pch=20,cex=2) 
+qqline(resid(model_d), col = "dodgerblue", lwd = 2)
+
+bptest(model_d)
+shapiro.test(resid(model_d))
+summary(model_d)
+#assumptions still violated - somewhat imporved R^2 - see two main 'sections of data', most likely due to age/smoking groups 
+#higher age/smoker group = more expensive costs vs. lower ages/non-smoker = lower costs 
+#distribution also uneven - up to 3x higher costs if in higher risk group
+```
+
+
+```{r}
+#Adding Polynomial Terms : *= model e/f
+model_e <- lm(charges~age+bmi+children+smoker+I(age^2)+I(bmi^2)+I(children^2),data=data1) 
+par(mfrow=c(1,2))
+plot(fitted(model_e), resid(model_e), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residual",cex=2,
+     main = "Residual plot")
+abline(h = 0, col = "darkorange", lwd = 2) 
+qqnorm(resid(model_e), col = "grey",pch=20,cex=2) 
+qqline(resid(model_e), col = "dodgerblue", lwd = 2)
+
+model_f <- lm(charges~age+bmi+children+smoker+I(age^2)+I(bmi^2)+I(children^2)+I(age^3)+I(bmi^3)+I(children^3),data=data1) 
+
+anova(model_a,model_e, model_f)
+AIC(model_a,model_e, model_f)
+BIC(model_a,model_e, model_f)
+#model_a has lowest AIC/BIC 
+
+summary(model_a)$adj.r.squared
+summary(model_e)$adj.r.squared
+summary(model_f)$adj.r.squared
+#R^2 does not change significantly 
+
+
+#model_a - best out of possible models (most simple), however, not great still as all assumptions are violated therefore inaccuarte for predicting insurance costs
+
+```
+```{r}
+# now we'd like to make some predictions using the best model for this which is the smoking interaction model without influential points
+smoker.inter.model5_wo_inf
+
+
+# predict using test set 
+charges_hat = predict(smoker.inter.model2, newdata = test)
+
+
+pred_vs_actual = data.frame(charges_hat,test$charges)
+RMSE_test = sqrt(mean((test$charges - charges_hat)^2))
+
+```
+
+
+
+```{r}
+# plot predicted data vs. actual data on test set 
+
+plot(charges_hat, col="red", pch=20, main ="Predicted Charges vs. Actual Charges on Test Data", ylab = "Insurance Charge ($)")
+text(200,50000,sprintf("RMSE: %.3f",RMSE_test))
+lines(test$charges, col = "blue")
+legend(350,50500,legend=c("Predicted","Actual"), col=c("blue","red"), lty = c(1,NA),pch=c(NA,1), cex=0.7 )
+
+
+```
+
+
